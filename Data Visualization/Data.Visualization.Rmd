@@ -1,0 +1,52 @@
+---
+title: "Data Visualization"
+author: "Divya Krishnan"
+date: "October 21, 2015"
+output: html_document
+---
+
+```{r}
+library(ggplot2)
+library(ggvis)
+```
+
+
+```{r}
+d<-data("diamonds")
+#?diamonds
+str(diamonds)
+summary(diamonds)
+head(diamonds)
+```
+
+Examples from Cookbook
+
+```{r}
+data(mtcars)
+# Cookbook examples
+
+mtcars %>% 
+  ggvis(~wt, ~mpg) %>% 
+  layer_points(size := 25, shape := "diamond", stroke := "red", fill := NA)
+
+mtcars %>% 
+  ggvis(~wt, ~mpg) %>%
+  layer_points() %>%
+  layer_smooths()
+```
+
+Question: Given the diamonds data, what would be the price of 3 carat diamond?
+
+Answer: The linear regression on Price as dependent variable and carat as independent variable, shows that the predicted price of a 3.0 carat diamond would be approximately $ 21,000 USD.
+
+```{r}
+# Plotting to understand the basic relationship between diamond prices and carats.
+plot(diamonds$carat,diamonds$price,xlab="Carat",ylab="Price")
+
+diamonds %>%
+  ggvis(x=~carat, y=~price,fill:="green") %>%
+    layer_points() %>%
+      layer_model_predictions(model="lm",se=TRUE)
+
+```
+

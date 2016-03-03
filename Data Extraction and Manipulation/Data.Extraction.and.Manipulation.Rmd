@@ -1,0 +1,377 @@
+---
+title: "Data Extraction and Manipulation"
+author: "Divya Krishnan"
+date: 'Monday, October 19, 2015'
+output: pdf_document
+---
+
+### Data Extraction and Manipulation ###
+
+
+\  
+
+
+```{r Setup, message=FALSE}
+# Stardard libraries
+library(jsonlite)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(RSocrata)
+library(acs)
+# Explicitly added the package of reshape2 for melt function
+library(reshape2)
+```
+
+<hr>
+
+\ 
+
+#### Open Government Data ####
+
+Use the following code to obtain data on the Seattle Police Department Police Report Incidents.
+
+```{r}
+# Importing the JSON file from URL
+policeIncidents <- fromJSON("https://data.seattle.gov/resource/7ais-f98f.json")
+# Exploring the dataset
+head(policeIncidents)
+# Getting the dmensions of the dataset
+dim(policeIncidents)
+# Exploring the variables
+colnames(policeIncidents)
+```
+
+##### (a) Describe, in detail, what the data represents. 
+
+The data represents initial police reports taken down by police officers when responding to incidents around Seattle (Seattle Police Department Police Report Incident, 2010). The datset has 1000 observations and 19 variables. 
+\
+
+References -
+\
+[1] Seattle Police Department Police Report Incident | Data.Seattle.Gov | Seattle's Data Site. (2010, July 28). Retrieved October 18, 2015, from https://data.seattle.gov/Public-Safety/Seattle-Police-Department-Police-Report-Incident/7ais-f98f
+
+
+##### (b) Describe each variable and what it measures. Be sure to note when data is missing. Confirm that each variable is appropriately cast - it has the correct data type. If any are incorrect, recast them to be in the appropriate format. 
+\
+The data set has the following variables - 
+\
+ [1] "offense_code"                      "offense_type"                      "census_tract_2000"                 "date_reported"                    
+ [5] "location"                          "zone_beat"                         "offense_code_extension"            "district_sector"                  
+ [9] "hundred_block_location"            "summarized_offense_description"    "month"                             "general_offense_number"           
+[13] "year"                              "longitude"                         "summary_offense_code"              "latitude"                         
+[17] "rms_cdw_id"                        "occurred_date_or_date_range_start" "occurred_date_range_end" 
+\
+\
+**Description for the variables -**
+The data set has the following variables -
+\
+ [1] "offense_code"  - The offense code for the police incident.
+\
+ [2] "offense_type" - The type of offense such as identity theft, disturbance, burgulary etc.
+\
+ [3] "census_tract_2000" - This is the census tract 2000 data. 
+\
+ [4] "date_reported" - The date the incident was reported on.
+\
+ [5] "location" - The data frame having the information such as needs_recoding, longitude and latitude. 
+\
+ [6] "zone_beat" -  The different zones that Seattle city is categorized into.
+\
+ [7] "offense_code_extension" - Different code extensions to the offense.
+\
+ [8] "district_sector" - The district sector of the incident.  
+\             
+ [9] "hundred_block_location" - The hundred block region of the incident.
+\
+ [10] "summarized_offense_description" - The summarized description of the offense. For example the offense type of "ASSLT-NONAGG" & "ASSLT-AGG-WEAPON" are categorized as "ASSAULT" in this variable. This variable gives a more broader category for the offense.
+\
+ [11] "month" - The month that the incident occured.
+\
+ [12] "general_offense_number" - The general offense number given to an incident.  
+\         
+ [13] "year" - The year that the incident occured.
+\
+ [14] "longitude" - The longitude measurement of the location of the incident.
+\
+ [15] "summary_offense_code" - The summarized offense code of the incident.
+\
+ [16] "latitude" - The latitude measurement of the location of the incident.
+\                        
+ [17] "rms_cdw_id" - Unique row identifier (Seattle Police Department Police Report Incident, 2010).
+\
+ [18] "occurred_date_or_date_range_start" - The date the incident occured or started.
+\ 
+ [19] "occurred_date_range_end" - The date the incident ended or the report was closed.
+\
+
+The rms_cdw_id is the unique code identifying each record. The following variables identify different types details about the offense, such as different offense codes and its description -
+\
+[1] "offense_code"                   "offense_type"                   "offense_code_extension"         "summarized_offense_description"
+[5] "general_offense_number"         "summary_offense_code"   
+\
+The dataset also has variables describing the date and time of the offenses
+[1] "date_reported"   "occurred_date_or_date_range_start"    "occurred_date_range_end"      
+\
+All the variables are in character data type. Though character datatype makes sense for most variables, but some variables need to be recast as numeric due to the nature of value recorded. 
+\
+\
+**Recasting of the variables are as follows -**
+\
+All the variables except the ones below have the appropriate datatype. The following variables need to be recasted in the format:Variable - Existing datatype - To recasted datatype
+ \
+policeIncidents\$location\$longitude - character - numeric
+\
+policeIncidents\$location\$latitude - character - numeric
+\
+policeIncidents\$longitude - character - numeric
+\
+policeIncidents\$latitude - character - numeric
+\
+policeIncidents\$month - character - numeric
+\
+policeIncidents\$year - character - numeric
+\
+\
+**Missing Data -**
+\
+1. offense_code - This variable has values of 'X', which are probably refer to missing data.
+\
+2. summary_offense_code - This variable has values of 'X', which are probably refer to missing data.
+\
+3. occured_date_range_end - This variable has NA values signifying missing data.
+\
+
+References -
+\
+[1] Seattle Police Department Police Report Incident | Data.Seattle.Gov | Seattle's Data Site. (2010, July 28). Retrieved October 18, 2015, from https://data.seattle.gov/Public-Safety/Seattle-Police-Department-Police-Report-Incident/7ais-f98f
+
+
+```{r}
+# Exploring the variables
+colnames(policeIncidents)
+# Summary of each variable
+summary(policeIncidents)
+
+# Exploring different types of variable category
+names(select(policeIncidents,contains("offense")))
+names(select(policeIncidents,contains("date")))
+
+# Exploring the class and mode of the variables
+sapply(policeIncidents,class)
+sapply(policeIncidents,mode)
+
+# Exploring the location data frame
+names(policeIncidents$location)
+
+# Recasting some of the variables from character to numeric data type
+policeIncidents$location$longitude<-as.numeric(policeIncidents$location$longitude)
+policeIncidents$location$latitude<-as.numeric(policeIncidents$location$latitude)
+policeIncidents$longitude<-as.numeric(policeIncidents$longitude)
+policeIncidents$latitude<-as.numeric(policeIncidents$latitude)
+policeIncidents$month<-as.numeric(policeIncidents$month)
+policeIncidents$year<-as.numeric(policeIncidents$year)
+# Recasting date variables to Date datatype
+policeIncidents$date_reported<-as.Date(policeIncidents$date_reported)
+# Recasting date variables to Date datatype after formatting them using sub function
+policeIncidents$occurred_date_or_date_range_start<-as.Date(sub("T"," ",policeIncidents$occurred_date_or_date_range_start))
+policeIncidents$occurred_date_range_end<-as.Date(sub("T"," ",policeIncidents$occurred_date_range_end))
+
+#View(policeIncidents)
+```
+
+
+##### (c) Produce a clean dataset, according to the rules of tidy data discussed in class. Export the data for future analysis using the Rdata format. 
+```{r}
+# Copying the recasted policeIncidents dataset to tidy it
+policeIncidents.tidy<-policeIncidents
+
+#Checking the needs_recording column inside location data frame
+summary(policeIncidents.tidy[,"location"]["needs_recoding"])
+#Extracting latitude and longitude from the data frame location embedded in policeIncidents
+policeIncidents.tidy$location_longitude<-policeIncidents.tidy[,"location"]["longitude"]
+policeIncidents.tidy$location_latitude<-policeIncidents.tidy[,"location"]["latitude"]
+# Removing location dataframe
+policeIncidents.tidy<-subset(policeIncidents.tidy,select=-location)
+
+summary(policeIncidents.tidy)
+
+# Checking if multiple columns of longitude have the same data
+diff<-policeIncidents.tidy$longitude-policeIncidents.tidy$location_longitude
+summary(diff)
+# Checking if multiple columns of latitude have the same data
+diff<-policeIncidents.tidy$latitude-policeIncidents.tidy$location_latitude
+summary(diff)
+
+#Removing the extra columns
+policeIncidents.tidy<-subset(policeIncidents.tidy,select=-c(location_longitude,location_latitude))
+# Dataset details after tidying 
+summary(policeIncidents.tidy)
+colnames(policeIncidents.tidy)
+
+# Melting the date variables and removing NA values
+policeIncidents.tidy<-melt(
+  data=policeIncidents.tidy,
+  id=c("offense_code","offense_type","census_tract_2000","zone_beat","offense_code_extension","district_sector","hundred_block_location","summarized_offense_description","month","general_offense_number","year","longitude","summary_offense_code","latitude","rms_cdw_id"),
+  variable.name = "date_type",
+  value.name = "date_value",
+  na.rm=TRUE
+)
+
+
+# Melting the location variables and removing NA values
+policeIncidents.tidy<-melt(
+  data=policeIncidents.tidy,
+  id=c("offense_code","offense_type","census_tract_2000","zone_beat","offense_code_extension","district_sector","hundred_block_location","summarized_offense_description","month","general_offense_number","year","summary_offense_code","rms_cdw_id","date_type","date_value"),
+  variable.name = "location_measure",
+  value.name = "location_value",
+  na.rm=TRUE
+)
+
+# Exploring variables of the offense category 
+head(select(policeIncidents.tidy,contains("offense")))
+# Melting the different types of offense codes and removing NA values
+policeIncidents.tidy<-melt(
+  data=policeIncidents.tidy,
+  id=c("offense_type","census_tract_2000","zone_beat","district_sector","hundred_block_location","summarized_offense_description","month","year","rms_cdw_id","date_type","date_value","location_measure","location_value"),
+  variable.name = "offense_code_type",
+  value.name = "offense_code_value",
+  na.rm=TRUE
+)
+
+# Viewing the tidied dataset
+#View(policeIncidents.tidy)
+# Exploring the tidied dataset
+head(policeIncidents.tidy)
+colnames(policeIncidents.tidy)
+summary(policeIncidents.tidy)
+apply(policeIncidents.tidy,2,class)
+
+# Exporting the cleaned dataset
+save(policeIncidents.tidy,file="policeIncidentsTidy.Rdata")
+
+```
+
+##### (d) Describe any concerns you might have about this data. This may include biases, missing data, or ethical concerns.
+
+The greatest ethical concern is the privacy of the victims who are involved in the police incident. The open dataset makes the infromation available to anyone without any verification or procedures. The longitude and latitude variables reveal the exact location of the incident.  Also the police incident report can be combined with other sources of data and it can be used to cause greater discomfort for the victims. For example, a newspaper report about the items stolen in a house from a particular neighbourhood combined with the police incident report can give valuable information to the the wrong people. Hence, making the victims more vulnerable to future police incidents. The missing data in offense_code, summary_offense_code and occured_date_range_end variables represent incomplete information. The greater cause of concern is that we don't know how the missing values are represented in the different variables. For example what if '0' in offense_code_extension represents missing data. It is not easy to figure out all the meta data regarding the dataset and hence it is possible that people doing data analysis on the dataset can come to worng conclusions because of insufficient background on the dataset.
+
+#### Exploring the NYC Flights Data ####
+
+In this problem set we will use the data on all flights that departed NYC (i.e. JFK, LGA or EWR) in 2013. You can find this data in the `nycflights13` R package. 
+
+##### (a) Importing Data: ##### 
+Load the data and describe in a short paragraph how the data was collected and what each variable represents. 
+
+The nycflights data was collected from the Bureau of transportation statistics about the flights that departed from NYC airports in 2013. The dataset flights has 336776 observation of flights departing from NYC airports and 16 variables that capture the flight departure data. The dataset has the followiong variables -
+\
+[1] "year"  - Year of departure which is 2013 for all the records
+\
+[2] "month" - Month of flight departure
+\
+[3] "day" - Day of departure
+\
+[4] "dep_time" - departure time of flight
+\
+[5] "dep_delay" - departure delay
+\
+[6] "arr_time"  -  arrival time
+\
+[7] "arr_delay" - arrival delay
+\
+[8] "carrier"   - airline carrier (abbreviated in 2 letters)
+\
+[8] "tailnum"   - Tail number of the plane
+\
+[9] "flight"    - Flight number
+\
+[10] "origin"   - Origin of the flight which is one of the NYC airports
+\
+[11] "dest"     - Destination airport for the flight
+\
+[13] "air_time"  - Amount of time spent in air bny the flight
+\
+[14] "distance"  - The distance flown by the flight
+\
+[15] "hour"      - departure time in hours
+\
+[16] "minute"   - departure time in minutes
+\
+
+
+```{r}
+# Importing the nycflights13 dataset
+library(nycflights13)
+flights<-nycflights13::flights
+# Information about the dataset
+#?nycflights13::flights
+# Exploring the dataset
+head(flights)
+dim(flights)
+colnames(flights)
+summary(flights)
+sapply(flights,class)
+```
+
+##### (b) Data Manipulation: ##### 
+Use the flights data to answer each of the following questions. Be sure to answer each question with a written response and supporting analysis.
+
+- How many flights were there from NYC airports to Seattle in 2013?
+
+There are 3923 flights from NYC airports to Seattle in 2013.
+```{r}
+# Number of flights from NYC airports to Seattle airports
+
+flights %>%
+  filter(dest=="SEA") %>%
+    summarise(flight_count_NYC_to_SEA = n())
+
+```
+
+- How many airlines fly from NYC to Seattle?
+
+There are 5 airlines from NYC to Seattle.
+```{r}
+# Number of distinct airlines that fly from NYC to Seattle
+flights %>%
+  filter(dest=="SEA") %>%
+    distinct(carrier) %>%
+      summarise(airlines_count_NYC_to_SEA = n())
+
+```
+
+- How many unique air planes fly from NYC to Seattle?
+
+936 unique airplanes fly from NYC to Seattle
+```{r}
+# Number of unique air planes(given by tailnum column) that fly from NYC to Seattle
+flights %>%
+  filter(dest=="SEA") %>%
+    distinct(tailnum) %>%
+      summarise(planes_count_NYC_to_SEA = n())
+
+```
+
+- What is the average arrival delay for flights from NYC to Seattle?
+
+The average arrival delay for flights from NYC to Seattle is -1.099099
+```{r}
+# Average arrival delay for flights from NYC to Seattle
+flights %>%
+  filter(dest=="SEA") %>%
+    summarise(avg_delay = mean(arr_delay, na.rm=TRUE))
+
+```
+
+- What proportion of flights to Seattle come from each NYC airport?
+
+About 46.7% of flights to Seattle come from EWR airport in New York and 53.3% of flights to Seattle come from JFK airport.
+```{r}
+# Proportion of flights to Seattle from respective NYC airports
+flights %>%
+  filter(dest=="SEA") %>%
+    group_by(origin) %>%
+      summarise(num_flights = n()) %>%
+        mutate(proportion_flights = num_flights*100/sum(num_flights))
+
+```

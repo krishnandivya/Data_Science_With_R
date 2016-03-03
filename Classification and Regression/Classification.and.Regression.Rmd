@@ -1,0 +1,198 @@
+---
+title: "Classification and Regression"
+author: "Divya Krishnan"
+date: "December 14, 2015"
+output: pdf_document
+---
+
+### Multivariate Logistic Regression ###
+
+```{r,message=FALSE}
+# Standard libraries
+library(RCurl)
+library(leaps)
+library(car)
+library(randomForest)
+library(pROC)
+library(boot)
+library(tree)
+library(AER)
+library(bestglm)
+# Setting seed
+set.seed(1)
+```
+
+In this problem we will use the infidelity data, known as the Fair's Affairs dataset. The 'Affairs' dataset is available as part of the AER package in R. This data comes from a survey conducted by Psychology Today in 1969, see Greene (2003) and Fair (1978) for more information.
+
+The dataset contains various self-reported characteristics of 601 participants, including how often the respondent engaged in extramarital sexual intercourse during the past year, as well as their gender, age, year married, whether they had children, their religiousness (on a 5-point scale, from 1=anti to 5=very), education, occupation (Hollingshead 7-point classiffication with reverse numbering), and a numeric self-rating of their marriage (from 1=very unhappy to 5=very happy).
+
+(a) Describe the participants. Use descriptive, summarization, and exploratory techniques to describe the participants in the study. For example, what proportion of respondents are female? What is the average age of respondents?
+
+There are 601 participants in the study. About 430 participants have children and 171 participants have no children at the time of the study. The study includes newly married participants as well as participants who have been married for about 15 years. There were 52% females and 47% males in the study. The average age of participants in the study is 32. Histogram of number of extramartial affairs of the respondents shows a right-skewed distribution. Most of the respondents never had any extramartial affairs.
+\ 
+
+```{r}
+
+# Exploratory data analysis
+data(Affairs)
+str(Affairs)
+summary(Affairs)
+# Histogram of the number of extramartial affairs
+hist(Affairs$affairs,xlab="Number of extramartial affairs",
+     main="Histogram of Extramartial Affairs")
+sex<-table(Affairs$gender)
+# Proportion of females
+sex[1]/sum(sex)
+# Proportion of males
+sex[2]/sum(sex)
+# Average age of respondents
+mean(Affairs$age)
+
+```
+
+(b) Suppose we want to explore the characteristics of participants who engage in extramarital sexual intercourse (i.e. affairs). Instead of modeling the number of affairs, we will consider the binary outcome - had an affair versus didn't have an affair. Create a new variable to capture this response variable of interest.
+
+```{r}
+# Creating a binary variable 'hadAffair' 
+Affairs$hadAffair<-as.factor(ifelse(Affairs$affairs>0,1,0))
+table(Affairs$hadAffair)
+```
+
+(c) Use an appropriate regression model to explore the relationship between having an affair and other personal characteristics. Comment on which covariates seem to be predictive of having an affair and which do not.
+\ 
+
+We may not want to consider the variable giving the number of extra martial afffairs(affairs variable) as the response variable, hadAffair has been computed from affairs variables. Hence, we will definitely see a relationship between the two variables and that will skew the model. Hence, to get a fair model we will use all predictor variables except number of affairs.
+\ 
+
+Based on the p-value, the following covariates seem to be predictive of having an affair - age, yearsmarried, religiousness, occupation and rating. Age, religiousness and rating seem to have a negative relationship with the response variable whereas yearsmarried and occupation seem to have a positive relationship. Self rating on their marriage and religiousness seem to have the strongest effect on the response variable. 
+
+```{r}
+# Converting the categorical predictors to factors
+Affairs$religiousness<-factor(Affairs$religiousness,levels=sort(unique(Affairs$religiousness)),
+                              labels=c("Anti","Not at all","Slightly","Somewhat","Very"))
+Affairs$education<-factor(Affairs$education,levels=sort(unique(Affairs$education)),
+                              labels=c("Grade school","High school graduate",
+                              "Some college","College graduate","Some graduate work",
+                              "Masters degree","Advanced degree"))
+Affairs$occupation<-factor(Affairs$occupation)
+Affairs$rating<-factor(Affairs$rating,levels=sort(unique(Affairs$rating)),
+                              labels=c("Very unhappy","Somewhat unhappy",
+                              "Average","Happier than average","Very happy"))
+# Logistic regression using all variables except affairs variable
+glm.affair<-glm(hadAffair ~ .,data=Affairs[,2:10],family=binomial)
+# Model summary
+summary(glm.affair)
+
+```
+
+References - https://cran.r-project.org/web/packages/AER/AER.pdf
+
+(d) Use an all subsets model selection procedure to obtain a "best" fit model. Is the model different from the full model you fit in part (c)? Which variables are included in the "best" fit model? You might find the bestglm() function available in the bestglm package helpful.
+\ 
+
+The best model is different than the full model in part(c) as it only includes the predictor variables - gender, age, yearsmarried, religiousness and rating. 
+
+```{r}
+# All subsets model selection based on AIC
+best.AIC<-bestglm(Affairs[2:10],family=binomial,IC="AIC")
+# Top 5 best models
+best.AIC$BestModels
+
+```
+
+(e) Interpret the model parameters using the model from part (d).
+\ 
+
+The AIC for the best model is 624.8. The best model suggest that the predictor variables, age, yearsmarried, religiousness and rating have a statistically significant realtionship with the response variable of having/not having an affair. 
+
+```{r}
+# Coefficients for the best model
+best.AIC$BestModel
+# Summary of the best model
+summary(best.AIC$BestModel)
+
+```
+
+(f) Create an artificial test dataset where martial rating varies from 1 to 5 and all other variables are set to their means. Use this test dataset and the predict function to obtain predicted probabilities of having an affair for case in the test data. Interpret your results and use a visualization to support your interpretation.
+\ 
+
+The artificial test is created using the means of the variables for interval variables age and yearsmarried. For the ordinal variables (religiousness, education and occupation), median was used and for the nominal variables (gender,children), mode was used as a measure of central tendency. This test dataset would only predict 'not having an affair'(hadAffair variable=0) due to having all values set to means/median/mode and having zero variance. The predicted values are 0.15,0.22,0.27,0.45 and 0.47. The histogram shows that the number of records are somewhat distributed in a similar way within the 5 probabilitites and none of the probabilities are equal to or greater than 0.5. Hence all of the predicted classification would be not having an affair.
+\ 
+
+```{r}
+# Creating rating as a random sequence of 1 to 5
+rating<-sample(c(1:5),nrow(Affairs),replace=TRUE)
+rating<-factor(rating,levels=sort(unique(rating)),
+               labels=c("Very unhappy","Somewhat unhappy",
+                        "Average","Happier than average","Very happy"))
+# Finding median values for ordinal variables
+median(as.numeric(Affairs$religiousness))
+median(as.numeric(Affairs$education))
+median(as.numeric(Affairs$occupation))
+# Finding mode for nominal variables
+table(Affairs$gender)
+table(Affairs$children)
+# Creating the test dataset using measures of central tendency
+affairsTest<-data.frame(gender=factor("female"),age=mean(Affairs$age),
+                        yearsmarried=mean(Affairs$yearsmarried),
+                        children=factor("yes"),religiousness=factor("Slightly"),
+                        education=factor("College graduate"),
+                        occupation=factor("5"),rating)
+# Predicting for affairs
+yhat.affair<-predict(glm.affair,affairsTest,type="response")
+# Exploring predicted values
+summary(yhat.affair)
+table(round(yhat.affair,4))
+glm.pred.affair<-rep(0,nrow(affairsTest))
+# Predicting affair on threshold probability of 0.5
+glm.pred.affair[yhat.affair>0.5]<-1
+# Plotting the predicted probabilities
+hist(yhat.affair,col="blue",xlab="Predicted Values",
+     main="Histogram of Predicted Values")
+# Predicted classification
+table(glm.pred.affair)
+```
+
+#### Classification - Regression ####
+
+Please answer the questions below by writing a short response.
+
+(a) Describe three real-life applications in which classification might be useful. Describe the response, as well as the predictors. Is the goal in each application inference or predictions? Explain your answer.
+\ 
+1. Garbage sorting - 
+\ 
+The response would be the garbage classification as compost, recycle or trash. The predictor variable could be properties of the waste such as its composition, biodegradable nature, lifespan of the waste etc. The goal in this application is prediction as we can sort waste automatically using this application. Based on the predictors, we would be able to decide whether the waste is compost, recycle or trash. 
+
+2. Gmail Classification -
+\ 
+Gmail's mail classification classifies email as primary, social and promotions. The predictor variable could be presence of keywords (such as buy, discount, offer, login, membership), presence of more than 10 email ids in the receiver address. The goal of this application is prediction so that the users can have their mail already sorted based on prior knowledge of mail classification.  
+
+3. Stock Analysis - 
+\ 
+Classifiying the stocks as buy, sell or hold is very important in stock market analysis. The predictor variables can be performance of the stock yesterday, market capital of the stock, P/E ratio, dividend yield, one-month high, one-month low. The goal of the application is prediction as the stock traders want to beat the market to make maximum profits. 
+\ 
+
+
+(b) Describe three real-life applications in which regression might be useful. Describe the response, as well as the predictors. Is the goal in each application inference or predictions? Explain your answer.
+\ 
+1. To find the GPA for students currently in Data Science: Theory class - 
+\ 
+The response variable would be the GPA of students for Data Science:Theory class.The predictors could be a number of factors such as the past performance in other Data Science elective classes, number of online Data science courses taken, number of projects done in Data science. The goal in this application would be to predict the GPA of the students. 
+\ 
+
+2. Does median income affect hospitalizations in Washington state? 
+\ 
+The response variable is the number of hospitalizations. The predictor variable is the median income of the patient. The goal in this application is inference which tells us whether there is a relationship between median income and the hospitalizations in Washington state.
+\ 
+
+3. How does weather affect the football result of Seattle Seahawks when playing in Seattle?
+\ 
+The response variable is outcome(winning or lossing) of the football match. The predictor variable is temperature of the match day, precipitation in inches on the match day, wind speed on the match day. The goal of the application is inference as we want to understand the affect of temperature, precipitation and wind speed (weather) on the outcome of the football match.
+\ 
+
+(c) What are the advantages and disadvantages of a very fexible (versus a less flexible) approach for regression or classification? Under what circumstances might a more flexible approach be preferred to a less flexible approach? When might a less flexible approach be preferred?
+\ 
+
+The advantage of a very flexible approach for regression or classification is that bias will decrease and we can obtain a better fit for the training data. The disadvantage of a very flexible approach is that variance will increase and there is a risk of overfitting the training data and increasing the test error. When we are interested in interpretation or inference, we might prefer a less flexible approach. When we are interested in prediction, we might prefer a more flexible approach even though the intepretability might be less.
+\ 
+

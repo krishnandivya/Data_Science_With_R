@@ -1,0 +1,244 @@
+---
+title: "Logistic Regression and Prediction"
+author: "Divya Krishnan"
+date: 'Monday, December 7, 2015'
+output: pdf_document
+---
+
+### Logistic Regression and Prediction ###
+
+\  
+
+```{r Setup, message=FALSE}
+# Stardard libraries
+library(pROC)
+library(randomForest)
+```
+\ 
+
+#### Train-Test split ####
+
+As part of this assignment we will evaluate the performance of a few different statistical learning methods. We will fit a particular statistical learning method on a set of training observations and measure its performance on a set of test observations.
+
+(a) Discuss the advantages of using a training/test split when evaluating statistical models.
+\ 
+
+Splitting the dataset into training and test is important to evaluate models. When we use the training/test split, we can train the model on training set and see it's performance on the test set. This would give us the confusion matrix, which looks at predicted values versus actual values. The confusion matrix gives us idea about Type-I and Type-II error.
+
+(b) Split your data into a training and test set based on an 80-20 split, in other words, 80%
+of the observations will be in the training set.
+
+```{r}
+# Importing data
+titanic<-read.csv("titanic.csv",stringsAsFactors = TRUE)
+# Exploring the dataset
+str(titanic)
+
+# Setting seed
+set.seed(1)
+
+# Sampling the indexes that form the training set
+train<-sample(1:nrow(titanic),round(0.8*nrow(titanic),0))
+# Exploring Training set
+str(titanic[train,])
+# Exploring Test set
+str(titanic[-train,])
+
+# Creating logical vectors for training set
+titanicTrain<-rep(FALSE,nrow(titanic))
+titanicTrain[train]<-TRUE
+
+```
+
+#### Logistic Regression ####
+
+In this problem set our goal is to predict the survival of passengers. First consider training a logistic regression model for survival that controls for the socioeconomic status of the passenger.
+
+(a) Fit the model described above using the glm function in R.
+\ 
+
+Since pclass variable gives the passenger class, it can be used as the socioeconomic status of the passenger. Hence the logistic regression was done using pclass as the predictor.
+
+```{r}
+
+# Converting survived variable into factor
+titanic$survived<-as.factor(titanic$survived)
+# Logistic regression
+modPclass<-glm(survived ~ pclass,data=titanic,
+             family=binomial,subset=titanicTrain)
+# Summary of the model
+summary(modPclass)
+
+```
+
+
+(b) What might you conclude based on this model about the probability of survival for lower class passengers?
+Note: If your model looks unstable you might consider using the bayesglm function from the arm package.
+\ 
+
+The 1st, 2nd and 3rd class of passengers is assigned as 1,2 and 3 respectively. The logistic regression suggests that as we move from one class to next(in the order of 1,2,3), the log odds of survival changes by -0.75. This conclusion is statistically significant as p-value is very close to zero. So the probability of survival is highest for 1st class passengers, lower for 2nd class passengers and the lowest for 3rd class passengers. 
+\
+
+
+```{r}
+
+# Coefficient estimates
+modPclass$coefficients
+# p-value of beta1 coefficient
+summary(modPclass)$coefficients[2,4]
+
+```
+
+#### Model Performance ####
+
+Next, let's consider the performance of this model.
+
+(a) Predict the survival of passengers for each observation in your test set using the model fit in Problem 2. Save these predictions as yhat.
+
+```{r}
+# Predicting the survival for test set
+yhat<-predict(modPclass,titanic[!titanicTrain,],type="response")
+# Exploring predicted values
+str(yhat)
+```
+
+
+(b) Use a threshold of 0.5 to classify predictions. What is the number of false positives on the test data? Interpret this in your own words.
+\ 
+
+The number of false positives on the test data is 23. This means that the logistic regression model predicted 23 cases of survival when they had actually not survived. 23 passengers who did not survive were wrongly classified by the model as survived.
+\ 
+
+```{r}
+# Actual survival values in the test set
+survivedTest<-titanic$survived[!titanicTrain]
+
+pred<-rep(0,nrow(titanic[!titanicTrain,]))
+# Predicting survival based on threshold probability of 0.5
+pred[yhat>0.5]<-1
+
+# Looking at error in prediction
+table(pred,survivedTest)
+# False positives
+table(pred,survivedTest)[2,1]
+```
+
+
+(c) Using the roc function, plot the ROC curve for this model. Discuss what you find.
+\ 
+
+An ideal ROC curve will hug the top-left corner of the plot. The ROC curve of the model shows that it is not an ideal and the AUC is 0.69. Hence there is scope to improve the model.
+\ 
+
+```{r}
+# ROC curve
+roc1<-roc(survivedTest,yhat)
+
+# AUC for the model
+auc1<-round(roc1$auc,2)
+plot.roc(roc1,main="ROC Curve",col=2,legacy.axes=TRUE,
+         xlab="False positive rate(1-specificity)",ylab="True positive rate(sensitivity)")
+legend(0.3,0.3,c(paste0("AUC-",auc1)),2)
+
+```
+
+#### Multivariate Logistic regression ####
+
+Suppose we use the data to construct a new predictor variable based on a passenger's listed title (i.e. Mr., Mrs., Miss., Master).
+
+(a) Why might this be an interesting variable to help predict passenger survival?
+\ 
+
+When a disaster occurs, usually the children and the ladies are rescued first, before rescuing the men. Hence it would be intersting to see whether more children and ladies survived compared to men. The title variable would help us in answering this question.
+\ 
+
+(b) Use the following custom function to add this predictor to your dataset.
+
+```{r}
+
+# A function to construct a feature that looks at passenger titles
+f <- function(name) {
+for (title in c("Master", "Miss", "Mrs.", "Mr.")) {
+if (grepl(title, name)) {
+return(title)
+}
+}
+return("Nothing")
+}
+
+tempTitle = vector()
+# Extracting title for each passenger
+for(i in 1:(nrow(titanic)))
+{
+  tempTitle<-c(tempTitle,f(titanic$name[i]))
+}
+# Adding the title variable to titanic dataset
+titanic$title<-tempTitle
+
+```
+
+
+(c) Fit a second logistic regression model including this new feature. Use the summary function to look at the model. Did this new feature improve the model?
+\ 
+
+The summary of the new model suggest that the strongest association is between survival of passengers and the title "Mr." (-2.25 approximately). The model also shows that there is a statistically significant association only between survived and pclass, 'Mr.' title and 'Nothing' title(or missing titles).
+\ 
+
+Comparing the AIC of the 2 models, shows that the new model (AIC=991 approximately) using pclass and title is better than the old model (AIC=1301 approximately) using only pclass as the predictor variable.
+\ 
+
+```{r}
+# Logistic regression, including title
+glmTitanic<-glm(survived ~ pclass + title,data=titanic,
+             family=binomial,subset=titanicTrain)
+# Summary of the model
+summary(glmTitanic)
+# AIC of Model 1
+modPclass$aic
+# AIC of Model 2
+glmTitanic$aic
+
+```
+
+
+(d) Comment on the overall fit of this model. For example, you might consider exploring when misclassification occurs.
+\ 
+
+The logistic regression correctly predicted the survival 79.39%. The confusion matrix shows that number of false positives were 22 and false negatives were 32. The false positive rate(Type I error) is about 0.084 and the true positive rate is about 0.686.
+\ 
+
+```{r}
+
+# Predicting the probability of survival in test set
+glm.prob<-predict(glmTitanic,titanic[!titanicTrain,],type="response")
+glm.pred<-rep(0,nrow(titanic[!titanicTrain,]))
+# Assigning survival as 1 for threshold probability of 0.5
+glm.pred[glm.prob>0.5]<-1
+# Misclassification displayed as confusion matrix
+table(glm.pred,survivedTest)
+# Prediction accuracy
+round(mean(glm.pred==survivedTest)*100,2)
+# False positives (Type I error)
+falsePos<-table(glm.pred,survivedTest)[2,1]
+falsePos
+# False negatives (Type II error)
+falseNeg<-table(glm.pred,survivedTest)[1,2]
+falseNeg
+# False positive rate (Type I error)
+falsePos/sum(table(glm.pred,survivedTest))
+# True positive
+truePos<-table(glm.pred,survivedTest)[2,2]
+truePos
+# True positive rate (Power)
+truePos/(truePos+falseNeg)
+```
+
+
+(e) Predict the survival of passengers for each observation in your test data using the new model. Save these predictions as yhat2.
+
+```{r}
+# Predicted values based on the second model
+yhat2<-predict(glmTitanic,newdata=data.frame(titanic[!titanicTrain,]),type="response")
+
+```
+

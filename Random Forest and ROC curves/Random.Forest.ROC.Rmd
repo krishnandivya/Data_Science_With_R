@@ -1,0 +1,197 @@
+---
+title: "Random Forest and ROC curves"
+author: "Divya Krishnan"
+date: "December 14, 2015"
+output: pdf_document
+---
+
+### Random Forest & ROC Curves ###
+
+```{r,message=FALSE}
+# Standard libraries
+library(RCurl)
+library(leaps)
+library(car)
+library(randomForest)
+library(pROC)
+library(boot)
+library(tree)
+library(AER)
+library(bestglm)
+# Setting seed
+set.seed(1)
+```
+
+
+The Wisconsin Breast Cancer dataset is available as a comma-delimited text file on the UCI Machine Learning Repository http://archive.ics.uci.edu/ml. Our goal in this problem will be to predict whether observations (i.e. tumors) are malignant or benign.
+
+(a) Obtain the data, and load it into R by pulling it directly from the web. (Do not download it and import it from a CSV file.) Give a brief description of the data.
+\ 
+
+The data is about Breast cancer patients who were either diagnosed with benign or malignant cancer. The dataset was created by Dr. William H. Wolberg from the University of Wisconsin Hospitals. The dataset has the following variables -
+\ 
+   1. Sample code number            
+   2. Clump Thickness               
+   3. Uniformity of Cell Size      
+   4. Uniformity of Cell Shape      
+   5. Marginal Adhesion             
+   6. Single Epithelial Cell Size   
+   7. Bare Nuclei                   
+   8. Bland Chromatin               
+   9. Normal Nucleoli               
+  10. Mitoses                       
+  11. Class - Cancer classified as benign(2) or malignant(4)
+
+```{r}
+url<-"http://archive.ics.uci.edu/ml/machine-learning-databases/breast-cancer-wisconsin/breast-cancer-wisconsin.data"
+# Reading data from URL
+cancer<-read.csv(url,header=FALSE,stringsAsFactors=FALSE)
+# Exploring the dataset
+str(cancer)
+```
+
+References - http://archive.ics.uci.edu/ml/machine-learning-databases/breast-cancer-wisconsin/breast-cancer-wisconsin.names
+
+(b) Tidy the data, ensuring that each variable is properly named and cast as the correct data type. Discuss any missing data.
+\ 
+
+Column nuclei has 16 records of missing data, which has been coded as '?'. The missing values have been omitted from the dataset for analysis.
+
+```{r}
+# Renaming the columns appropriately
+colnames(cancer)<-c("id","cThickness","cellSize","cellShape","adhesion",
+                    "eCellSize","nuclei","chromatin","nucleoli","mitoses","class")
+# Reformatting the response variable as factor
+cancer$class<-as.factor(cancer$class)
+# Summary of the dataset
+summary(cancer)
+# Exploring missing data in nuclei column
+table(cancer$nuclei)
+# Substituting the missing value with NA
+cancer$nuclei<-sub("\\?",NA,as.character(cancer$nuclei))
+# Omitting missing data
+cancer<-na.omit(cancer)
+# Reformatting the nuclei variable
+cancer$nuclei<-as.numeric(cancer$nuclei)
+```
+
+(c) Split the data into a training and validation set such that a random 70% of the observations are in the training set.
+
+```{r}
+# Sampling the indexes that form the training set
+train<-sample(1:nrow(cancer),round(0.7*nrow(cancer),0))
+# Exploring Training set
+str(cancer[train,])
+# Exploring Test set
+str(cancer[-train,])
+# Creating logical vectors for training set
+cancerTrain<-rep(FALSE,nrow(cancer))
+cancerTrain[train]<-TRUE
+```
+
+(d) Fit a regression model to predict whether tissue samples are malignant or benign. Classify cases in the validation set. Compute and discuss the resulting confusion matrix.
+\ 
+
+The logistic regression correctly predicted the survival 96.59%. The confusion matrix shows that number of false positives were 4 and false negatives were 3. The false positive rate(Type I error) is about 0.02 and the true positive rate is about 0.96.
+
+```{r}
+# Logistic regression
+glm.cancer<-glm(class ~ .,data=cancer,
+             family=binomial,subset=cancerTrain)
+# Summary of the model
+summary(glm.cancer)
+# Coefficient estimates
+glm.cancer$coefficients
+
+# Predicting the survival for test set
+yhat<-predict(glm.cancer,cancer[!cancerTrain,],type="response")
+# Exploring predicted values
+str(yhat)
+# Actual survival values in the test set
+classTest<-cancer$class[!cancerTrain]
+glm.pred<-rep(2,nrow(cancer[!cancerTrain,]))
+# Predicting survival based on threshold probability of 0.5
+glm.pred[yhat>0.5]<-4
+
+# Looking at error in prediction
+table(glm.pred,classTest)
+# Prediction accuracy
+round(mean(glm.pred==classTest)*100,2)
+# False positives (Type I error)
+falsePos<-table(glm.pred,classTest)[2,1]
+falsePos
+# False negatives (Type II error)
+falseNeg<-table(glm.pred,classTest)[1,2]
+falseNeg
+# False positive rate (Type I error)
+falsePos/sum(table(glm.pred,classTest))
+# True positive
+truePos<-table(glm.pred,classTest)[2,2]
+truePos
+# True positive rate (Power)
+truePos/(truePos+falseNeg)
+
+```
+
+(e) Fit a random forest model to predict whether tissue samples are malignant or benign. Classify cases in the validation set. Compute and discuss the resulting confusion matrix.
+\ 
+
+The confusion matrix shows that number of false positives were 6 and false negatives were 8. The false positive rate(Type I error) is about 0.013 and the true positive rate is about 0.952.
+
+```{r}
+# Random forest function
+rfcancer<-randomForest(class ~ .,data=cancer,subset=train)
+# Model
+rfcancer
+# Importance of each predictor
+rfcancer$importance
+# Predicted values based on random forest model
+rfyhat<-predict(rfcancer,newdata=cancer[-train,])
+# Confusion Matrix
+rfcancer$confusion
+
+# False positives (Type I error)
+falsePos<-rfcancer$confusion[2,1]
+falsePos
+# False negatives (Type II error)
+falseNeg<-rfcancer$confusion[1,2]
+falseNeg
+# False positive rate (Type I error)
+falsePos/sum(rfcancer$confusion[1:2,1:2])
+# True positive
+truePos<-rfcancer$confusion[2,2]
+truePos
+# True positive rate (Power)
+truePos/(truePos+falseNeg)
+
+```
+
+(f) Compare the models from part (d) and (e) using ROC curves. Which do you prefer? Be sure
+to justify your preference.
+\
+
+The ROC curve of the regression model performs slightly better than the random forest model. The AUC  for the regression model is about 0.9945 whereas AUC for random forest is 0.9741. Hence, we prefer the regression model.
+
+```{r}
+
+# Confusion matrix for test set for Logistic regression model
+table(glm.pred,classTest)
+# Confusion matrix for test set for Random forest model
+rfcancer$confusion[1:2,1:2]
+
+# ROC for Model 3 
+rocLm<-roc(as.numeric(classTest),as.numeric(yhat))
+# ROC for Model 4
+roc4Rf<-roc(as.numeric(classTest),as.numeric(rfyhat))
+
+# AUC for Model 3
+aucLm<-round(rocLm$auc,4)
+# AUC for Model 4
+aucRf<-round(roc4Rf$auc,4)
+# ROC curve displaying Model 3 & 4
+plot.roc(rocLm,main="ROC Curves",col=2,legacy.axes=TRUE,
+         xlab="False positive rate(1-specificity)",ylab="True positive rate(sensitivity)")
+plot.roc(roc4Rf,add=TRUE,col=3)
+legend(0.4,0.4,c(paste0("AUCLm - ",aucLm),paste0("AUCRf - ",aucRf)),2:3)
+
+```

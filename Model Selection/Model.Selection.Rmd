@@ -1,0 +1,213 @@
+---
+title: "Model Selection"
+author: "Divya Krishnan"
+date: "December 14, 2015"
+output: pdf_document
+---
+
+### Model Selection ###
+
+```{r,message=FALSE}
+# Standard libraries
+library(RCurl)
+library(leaps)
+library(car)
+library(randomForest)
+library(pROC)
+library(boot)
+library(tree)
+library(AER)
+library(bestglm)
+# Setting seed
+set.seed(1)
+```
+
+In this problem we will revisit the state dataset. This data, available as part of the base R package, contains various data related to the 50 states of the United States of America.
+
+Suppose you want to explore the relationship between a state's Murder rate and other characteristics
+of the state, for example population, illiteracy rate, and more. Follow the questions below to perform this analysis.
+
+(a) Examine the bivariate relationships present in the data. Briefly discuss notable results. You might find the scatterplotMatrix() function available in the car package helpful.
+\ 
+
+Since the state dataset has a lot of categorical variables, we choose to consider only state.x77 which has all numeric variables including the response variable, Murder. Also the variables in the state.x77 dataset seem to be more suited for predictor variables.
+\ 
+
+There seems to be positive bivariate relationship between -
+\ 
+
+(High-school graduates and income), (High-school graduates and life expectancy) and (Murder and illiteracy).
+\ 
+
+There seems to be a negative bivariate relationship between -
+\ 
+
+(Life expectancy and illiteracy), (High school graduates and illiteracy), (Frost and illiteracy), (Murder and life expectancy) and (Murder and Frost).
+\ 
+
+```{r}
+# Getting state dataset
+data(state)
+# Creating a data frame of the various variables 
+  # inside state data set including the matrix variable state.x77
+state<-data.frame(cbind(abb=state.abb,area=state.area,
+                  longitude=state.center$x,latitude=state.center$y,
+                  division=state.division,name=state.name,
+                  region=state.region),state.x77)
+str(state)
+# Using only the state.x77 dataset and rearranging the columns
+st<-cbind(state[,8:11],state[,13:15],state[12])
+# Scatterplot of bivariate realtionships in state.x77
+scatterplotMatrix(st)
+# Correlation Matrix
+cor(st)
+# Checking significant correlations
+ifelse(cor(st)>=0.5,1,ifelse(cor(st)<=-0.5,-1,0))
+```
+
+#### Multivariate Linear Regression ####
+
+Fit a multiple linear regression model. How much variance in the murder rate across states do the predictor variables explain?
+\ 
+
+The r-squared value is 0.8083 and adjusted r-squared value is 0.7763. Since it is multiple linear regression, we should consider adjusted r-squared value to account for model complexity. As per adjusted r-squared value, about 77.63% of variance in the dataset is explained by the predictor variables.
+\ 
+
+```{r}
+# Fitting multiple linear regression
+fit.mlm<-lm(Murder ~ .,data=st)
+# R-squared value
+summary(fit.mlm)$r.squared
+# Adjusted r-squared value
+summary(fit.mlm)$adj.r.squared
+```
+
+#### Residual Analysis ####
+
+Evaluate the statistical assumptions in your regression analysis from part (b) by performing a basic analysis of model residuals and any unusual observations. Discuss any concerns you have about your model.
+\ 
+
+The plot of residuals vs fitted values seems normally distributed and doesn't show any patterns. Hence linear model seems appropriate. But the residual plot shows that there is lot of variance in the residuals. 
+\ 
+
+The p-value suggests that only population and life expectancy have statistically significant association. Population seems to have a positive relationship with Murder but the coefficient estimate is very close to zero(0.000188) whereas life expectancy seems to have a negative relationship with the coefficient estimate of -1.655. 
+\ 
+
+```{r}
+# Residual plot
+plot(fit.mlm$residuals ~ fit.mlm$fitted.values,
+     xlab="Fitted Values",ylab="Residuals",main="Residuals Vs Fitted Values")
+abline(lm(fit.mlm$residuals ~ fit.mlm$fitted.values))
+# Model summary
+summary(fit.mlm)
+```
+
+#### Stepwise Model Selection ####
+
+Use a stepwise model selection procedure of your choice to obtain a "best" fit model. Is the model different from the full model you fit in part (b)? If yes, how so?
+\ 
+
+The best fit model seems to be lm(Murder ~ Life.Exp + Frost + Population + Area + Illiteracy).
+\ 
+The model is different from the full model as it has excluded percentage of high school graduates and income variable. In the best model, life expectancy, population and area have statistically significant association with the response variable. The adjusted r-squared value suggest that the best model explains 78.48% (slightly more than the full model) of the variance in the dataset. 
+\ 
+
+```{r}
+# Null model
+nullModel<-lm(Murder ~ 1,data=st)
+# Full model
+fullModel<-lm(Murder ~ .,data=st)
+# Stepwise model selection
+stStep<-step(nullModel,scope=list(lower=nullModel,upper=fullModel),direction="both")
+# Summary of the best model
+summary(stStep)
+```
+
+#### 10-fold Cross Validation ####
+
+Assess the model (from part (d)) generalizability. Perform a 10-fold cross validation to estimate model performance. Report the results.
+\ 
+
+The 10-fold cross validation shows that the standard k-fold CV estimate of the model is 3.546 and the bias-corrected version is 3.484. 
+\ 
+
+```{r}
+# Fitting the best model
+glm.fit<-glm(Murder ~ Life.Exp + Frost + Population + Area + Illiteracy,
+             data=st)
+# Model summary
+summary(glm.fit)
+# Compute k-fold CV estimate of the test MSE
+cv.err.k10<-cv.glm(st, glm.fit, K=10)
+# Delta vector containing cv results 
+cv.err.k10$delta
+```
+
+#### Regression Tree ####
+
+Fit a regression tree using the same covariates in your "best" fit model from part (d). Use cross validation to select the "best" tree.
+\ 
+
+The regression tree used only 2 predictors to contsruct the tree - life exectancy and frost. The regression tree had a size of 6. But the cross validation revealed that the tree with size 5 has minimum deviance of 412.2660 (although the difference is only about 0.2, from tree of size 6). Hence, the tree was pruned to size 5 to obtain the best model. The best model also uses life expectancy and frost as predictors but has only 5 terminal nodes. 
+\ 
+
+```{r}
+# Creating training set using 80% of the dataset
+train<-sample(1:nrow(st),round(0.8*nrow(st),0))
+# Regression tree creation
+tree.st<-tree(Murder ~ Life.Exp + Frost + Population + Area + 
+                Illiteracy,data=st,subset=train)
+# Tree summary
+summary(tree.st)
+# Plotting the tree
+plot(tree.st)
+text(tree.st,pretty=0)
+# Cross validation
+cv.err.regression<-cv.tree(tree.st, FUN=prune.tree,K=10)
+# Cross validation results
+cv.err.regression
+# Plotting to understand the best tree 
+plot(cv.err.regression$size,cv.err.regression$dev,type='b',
+     xlab="Size",ylab="Deviance",main="Plot of Deviance Vs Size")
+# Pruning tree based on minimum deviance
+prune.st<-prune.tree(tree.st,best=5)
+# Plotting best tree based on minimum deviance
+plot(prune.st)
+text(prune.st,pretty=0)
+```
+
+#### Model Performance Comparison ####
+
+Compare the models from part (d) and (f) based on their performance. Which do you prefer? Be sure to justify your preference.
+\ 
+
+The test MSE for the best model according to part (d) is 3.5 (based on 10-fold cross validation). The test MSE for the regression tree according to part (f) is 5.56 and the test MSE for the pruned tree is 8.46. So neither the regression tree noe the pruned tree b ased on cross validation performs better than the best model as suggested by the step function. Hence, the model from part (d) is preferred as it has low test error.
+
+```{r}
+# Performance of model from part (d)
+summary(glm.fit)
+# Test MSE for the best model according to step function
+cv.err.k10$delta
+
+# Test set
+st.test<-st[-train,"Murder"]
+# Performance of tree model from part (f)
+summary(tree.st)
+# Predicting the Murder rate
+yhat.tree.st<-predict(tree.st,newdata=st[-train,])
+# Plot of Actual values Vs Predicted values
+plot(yhat.tree.st,st.test,xlab="Predicted values",ylab="Actual values")
+abline(lm(st.test ~ yhat.tree.st))
+# Test MSE associated with the regression tree
+mean((yhat.tree.st-st.test)^2)
+
+# Performance of pruned tree from part (f)
+summary(prune.st)
+# Predicting the Murder rate
+yhat.prune.st<-predict(prune.st,newdata=st[-train,])
+# Plot of Actual values Vs Predicted values
+plot(yhat.prune.st,st.test,xlab="Predicted values",ylab="Actual values")
+abline(lm(st.test ~ yhat.prune.st))
+# Test MSE associated with the pruned tree
+mean((yhat.prune.st-st.test)^2)
+```

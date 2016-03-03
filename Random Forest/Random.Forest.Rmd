@@ -1,0 +1,134 @@
+---
+title: "Random Forest"
+author: "Divya Krishnan"
+date: 'Monday, December 7, 2015'
+output: pdf_document
+---
+
+
+### Random Forest ###
+
+
+```{r Setup, message=FALSE}
+# Stardard libraries
+library(pROC)
+library(randomForest)
+```
+
+Importing Titanic dataset and splitting the dataset into train and test sets.
+
+```{r}
+# Importing data
+titanic<-read.csv("titanic.csv",stringsAsFactors = TRUE)
+
+# Setting seed
+set.seed(1)
+
+# Sampling the indexes that form the training set
+train<-sample(1:nrow(titanic),round(0.8*nrow(titanic),0))
+# Exploring Training set
+str(titanic[train,])
+# Exploring Test set
+str(titanic[-train,])
+
+# Creating logical vectors for training set
+titanicTrain<-rep(FALSE,nrow(titanic))
+titanicTrain[train]<-TRUE
+
+```
+
+Suppose we use the data to construct a new predictor variable based on a passenger's listed title (i.e. Mr., Mrs., Miss., Master).
+
+Using custom function to add the predictor to your dataset.
+
+```{r}
+
+# A function to construct a feature that looks at passenger titles
+f <- function(name) {
+for (title in c("Master", "Miss", "Mrs.", "Mr.")) {
+if (grepl(title, name)) {
+return(title)
+}
+}
+return("Nothing")
+}
+
+tempTitle = vector()
+# Extracting title for each passenger
+for(i in 1:(nrow(titanic)))
+{
+  tempTitle<-c(tempTitle,f(titanic$name[i]))
+}
+# Adding the title variable to titanic dataset
+titanic$title<-tempTitle
+
+```
+
+#### Random Forest Classification ####
+
+Another very popular classifier used in data science is called a random forest.
+
+(a) Use the randomForest function to fit a random forest model with passenger class and title as predictors. Make predictions for the test set using the random forest model. Save these predictions as yhat3.
+
+```{r}
+
+# Converting title and pclass as factors
+titanic$title<-as.factor(titanic$title)
+titanic$pclass<-as.factor(titanic$pclass)
+# Random forest model on trianing set
+rfTitanic<-randomForest(survived ~ pclass + title,data=titanic,subset=train)
+# Model
+rfTitanic
+# Importance of each predictor
+rfTitanic$importance
+# Predicted values based on random forest model
+yhat3<-predict(rfTitanic,newdata=titanic[-train,])
+
+```
+
+
+(b) Develop your own random forest model, attempting to improve the model performance. Make predictions for the test set using your new random forest model. Save these predictions as yhat4.
+
+```{r}
+
+# New random forest model inclduing Sex
+rfTitanicSex<-randomForest(survived ~ pclass + title + sex,data=titanic,subset=train)
+# Model
+rfTitanicSex
+# Importance of each predictor
+rfTitanicSex$importance
+# Predicted values based on new random forest model
+yhat4<-predict(rfTitanicSex,newdata=titanic[-train,])
+
+```
+
+(c) Compare the accuracy of each of the models from this problem set using ROC curves. Comment on which statistical learning method works best for predicting survival of the titanic passengers.
+\ 
+
+Looking at the ROC curves for both models, the model with pclass, title and sex as predictors (Model 4) performs better than the model with only pclass and title as predictor (Model 3). The AUC value for Model 4 is 0.77 whereas for Model 3 is 0.73. Hence Model 4 should be considered for predicting survival of titanic passengers.
+\ 
+
+```{r}
+
+# Confusion matrix for test set for Model 3
+table(yhat3,titanic[-train,]$survived)
+# Confusion matrix for test set for Model 4
+table(yhat4,titanic[-train,]$survived)
+
+# ROC for Model 3 
+roc3<-roc(as.numeric(titanic[-train,]$survived),as.numeric(yhat3))
+# ROC for Model 4
+roc4<-roc(as.numeric(titanic[-train,]$survived),as.numeric(yhat4))
+
+# AUC for Model 3
+auc3<-round(roc3$auc,2)
+# AUC for Model 4
+auc4<-round(roc4$auc,2)
+# ROC curve displaying Model 3 & 4
+plot.roc(roc3,main="ROC Curves",col=2,legacy.axes=TRUE,
+         xlab="False positive rate(1-specificity)",ylab="True positive rate(sensitivity)")
+plot.roc(roc4,add=TRUE,col=3)
+legend(0.3,0.3,c(paste0("AUC3 - ",auc3),paste0("AUC4 - ",auc4)),2:3)
+
+```
+

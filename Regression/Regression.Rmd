@@ -1,0 +1,504 @@
+---
+title: "Problem Set 3"
+author: "Divya Krishnan"
+date: 'Monday, Nov 30, 2015'
+output: pdf_document
+---
+
+### Univariate and Multivariate Regression ###
+
+\  
+
+```{r Setup, message=FALSE}
+
+# Explicitly added the package of coefplot for plotting regression coefficients
+library("coefplot")
+# Adding libraries for Birth data
+library("Sleuth3")
+# Adding library for height data
+library("UsingR")
+# Adding library for boston data
+library("MASS")
+
+```
+
+<hr>
+
+\ 
+
+#### Simple Linear Regression ####
+
+Davis et al. (1998) collected data on the proportion of births that were male in Denmark, the Netherlands, Canada, and the United States for selected years. Davis et al. argue that the proportion of male births is declining in these countries. We will explore this hypothesis.
+You can obtain this data as follows:
+
+```{r}
+# Extracting birth data
+birthData <- ex0724
+```
+
+(a) Use the lm function in R to fit four (one per country) simple linear regression models of the yearly proportion of males births as a function of the year and obtain the least squares fits. Write down the estimated linear model for each country.
+\ 
+
+Denmark = 0.5987 + (-4.289e-05) * Year
+\ 
+\ 
+
+Netherlands = 0.6724 + (-8.084e-05) * Year
+\ 
+\
+
+Canada = 0.7338 + (-1.112e-04) * Year
+\ 
+\
+
+USA = 0.6201 + (-5.429e-05) * Year
+\ 
+\
+
+
+```{r}
+# Fitting linear model for each country
+fitDenmark<-lm(Denmark ~ Year,data=birthData)
+fitNetherlands<-lm(Netherlands ~ Year,data=birthData)
+fitCanada<-lm(Canada ~ Year,data=birthData)
+fitUSA<-lm(USA ~ Year,data=birthData)
+# Linear model
+fitDenmark
+fitNetherlands
+fitCanada
+fitUSA
+
+```
+
+
+(b) Obtain the t-statistic for the test that the slopes of the regression lines are zero, for each of the four countries. Is there evidence that the proportion of births that are male is truly declining over this period?
+
+\ 
+The t-statistic for the countries are as follows (obtained from the summary) -
+\ 
+\ 
+
+Denmark -2.073
+\
+
+Netherlands -5.71
+\
+
+Canada -4.017
+\
+
+USA -5.779
+
+The t statistic gives results of the t-test with the null hypothesis that the beta-j coefficient is 0. The t-statistic for beta1 coefficient has the null hypothesis that the true linear model has slope zero. All the t-statistic values for beta1(as written above) indicate that they are in the region of rejection (greater than 1.96) for the two-sided t test, and hence we can reject the null hypothesis that the slopes of the regression lines are zero. This establishes a statistically significant association between year and the proportion of male births. Hence, looking at the negative regression coefficient(beta1) estimates, we can conclude that the proportion of births that are male is truly declining over this period.
+
+```{r}
+# Summary of linear models, which provides the t-statistic as well
+summary(fitDenmark)
+summary(fitNetherlands)
+summary(fitCanada)
+summary(fitUSA)
+
+```
+
+
+#### Analysis and Prediction using Regression ####
+
+Regression was originally used by Francis Galton to study the relationship between parents and children. One relationship he considered was height. Can we predict a man's height based on the height of his father? This is the question we will explore in this problem. You can
+obtain data similar to that used by Galton as follows:
+
+```{r}
+# Extracting height data
+heightData<-get("father.son")
+```
+
+(a) Perform an exploratory analysis of the dataset. Describe what you find. At a minimum you should produce statistical summaries of the variables, a visualization of the relationship of interest in this problem, and a statistical summary of that relationship.
+\ 
+\ 
+
+The statistical summaries of the variable indicate that the mean height for fathers is 67.69 inches and sons is 68.68. Most of the values in the dataset are in the range of (58,79). The histogram of the father's height and son's height suggests that each distribution is similar to a normal distribution. Scatterplot of the father's and son's height indicates a linear relationship between the two variables. The pearson correlation of father's and sons' height is 0.5 indicating a positive relationship.
+
+```{r}
+# Exploring the height data
+str(heightData)
+summary(heightData)
+# Creating histogram for each of the variables
+hist(heightData$fheight,xlab="Father's Height(in inches)",main="Histogram of Father's height")
+hist(heightData$sheight,xlab="Son's Height(in inches)",main="Histogram of Son's height")
+
+# Plotting father's height with sons's height
+g<- ggplot(heightData, aes(x=fheight, y=sheight)) 
+g<- g + geom_point() 
+g<- g + geom_smooth(method="lm") 
+g<- g + labs(x="Fathers' Height(in inches)", y="Sons' Height(in inches)",title="Height Data Plot")
+g
+# Finding pearson correlation of between father and son heights
+cor(heightData$fheight,heightData$sheight)
+
+```
+
+(b) Use the lm function in R to fit a simple linear regression model to predict son's height as a function of father's height. Write down the model,
+y-hat-sheight = Beta-hat-0 + Beta-hat-i * fheight
+filling in estimated coefficient values and interpret the coefficient estimates.
+\ 
+
+sheight(estimate) = 33.8866 + 0.5141 * fheight
+\ 
+\ 
+
+The above model can be intepreted as - For every 1 inch of increase in father's height, the son's height increases by about 0.5 inches. 
+
+```{r}
+# Fitting linear model for height data
+fitHeight<-lm(sheight ~ fheight,data=heightData)
+# Summary of linear model 
+summary(fitHeight)
+
+```
+
+
+(c) Find the 95% confidence intervals for the estimates. You may find the confint() command useful.
+\ 
+
+The 95% confidence interval for the estimates of intercept is - (30.2912,37.4820)
+\ 
+\
+
+The 95% confidence interval for the estimates of the slope is - (0.4610,0.5672) 
+
+```{r}
+# Confidence interval for the estimates
+confint(fitHeight)
+
+```
+
+(d) Produce a visualization of the data and the least squares regression line.
+
+```{r}
+# Plotting father's height with sons's height
+g<- ggplot(heightData, aes(x=fheight, y=sheight)) 
+g<- g + geom_point() 
+g<- g + geom_smooth(method="lm") 
+g<- g + labs(x="Fathers' Height(in inches)", y="Sons' Height(in inches)"
+             ,title="Height Data Plot")
+g
+
+```
+
+(e) Produce a visualization of the residuals versus the fitted values. (You can inspect the elements of the linear model object in R using names()). Discuss what you see. Do you have any concerns about the linear model?
+\
+\ 
+
+There is no pattern observed in the visualization between residuals and the fitted values.The residual plot helps in identifying non-linear relationships between the predictors and the response. Since, the residual plot does not show in strong pattern, we can safely use a linear model to understand the relationship between father's height and son's height.
+
+```{r}
+# Computing the fitted values using the linear model equation
+fittedValues<-33.8866 + (0.5141 * heightData$fheight)
+# Extracting the residuals
+heightResiduals<-as.vector(fitHeight$residuals)
+# Plotting residuals Vs fitted values
+plot(heightResiduals ~ fittedValues,xlab="Fitted Values",
+     ylab="Residuals",main="Residuals Vs Fitted Values")
+# Plotting the linear regression line between residuals and fitted values
+abline(lm(heightResiduals ~ fittedValues))
+# summary of the linear regression of residuals and fitted values
+summary(lm(heightResiduals ~ fittedValues))
+
+```
+
+(f) Using the model you fit in part (b) predict the height was 5 males whose father are 50, 55, 70, 75, and 90 inches respectively. You may find the predict() function helpful.
+\ 
+
+Prediction for the new data -
+\ 
+
+Father's height(in inches) - Son's Height(in inches)
+\ 
+
+50 - 59.5913
+\ 
+
+55 - 62.1617
+\ 
+
+70 - 69.8731
+\ 
+
+75 - 72.4436 
+\ 
+
+90 - 80.1550
+
+```{r}
+# Using predict function to predict the son's height for new father's height data
+round(predict(fitHeight, newdata = data.frame(fheight = c(50,55,70,75,90))),4)
+
+```
+
+#### Analysis and Prediction using Multiple Regression ####
+
+In this problem we will use the Boston dataset that is available in the MASS package. This dataset contains information about median house value for 506 neighborhoods in Boston, MA. Load this data and use it to answer the following questions.
+
+(a) Describe the data and variables that are part of the Boston dataset.
+\ 
+
+The data contains median house value for 506 neighborhoods in Boston, MA. It has the following attributes -
+
+\ 
+\ 
+
+1. CRIM: per capita crime rate by town 
+\ 
+
+2. ZN: proportion of residential land zoned for lots over 25,000 sq.ft. 
+\ 
+
+3. INDUS: proportion of non-retail business acres per town 
+\ 
+
+4. CHAS: Charles River dummy variable (= 1 if tract bounds river; 0 otherwise) 
+\ 
+
+5. NOX: nitric oxides concentration (parts per 10 million) 
+\ 
+
+6. RM: average number of rooms per dwelling 
+\ 
+
+7. AGE: proportion of owner-occupied units built prior to 1940 
+\  
+
+8. DIS: weighted distances to five Boston employment centres 
+\  
+
+9. RAD: index of accessibility to radial highways 
+\ 
+
+10. TAX: full-value property-tax rate per $10,000 
+\ 
+ 
+11. PTRATIO: pupil-teacher ratio by town 
+\ 
+
+12. B: 1000(Bk - 0.63)^2 where Bk is the proportion of blacks by town 
+\
+
+13. LSTAT: % lower status of the population 
+\ 
+
+14. MEDV: Median value of owner-occupied homes in $1000's
+\ 
+
+References - https://archive.ics.uci.edu/ml/datasets/Housing
+
+```{r}
+# Extracting boston data set
+boston<-get("Boston")
+str(boston)
+
+```
+
+(b) Consider this data what is the response variable of interest?
+\ 
+
+The response variable of interest could be the median value of houses, names medv. It could be very useful for home buyers and sellers to predict the value of a house, based on certain other known parameters.
+
+(c) For each predictor, fit a simple linear regression model to predict the response. In which of the models is there a statistically significant association between the predictor and the response? Create some plots to back up your assertions.
+\ 
+
+All the models show a statistically significant association between the independent variables and the response or dependent variable.
+\
+
+The independent variables that have the strongest association with the response variable is nox, rm,chas,ptration,dis and lstat, in decreasing order. Nox and ptratio have negative regression coefficient estimates whereas rm,chas and dis have positive regression coefficient estimates.
+
+```{r}
+# Storing the coefficient matrix of each univariate linear regression
+fit<-list()
+# Loop for computing linear regression for each independent variable 
+for(i in 1:(ncol(boston)-1))
+{
+  # Extracting the coefficients of the linear regression
+  fit[[i]]<-summary(lm(boston$medv ~ boston[[i]]))$coefficients
+}
+# Renaming the elements of the list with the variable names
+names(fit)<-colnames(boston)[1:13]
+# Rounding the coefficients 
+lapply(fit,round,digits=2)
+
+# Creating a list of coefficient estimates 
+coefRes<-data.frame(varName=as.character(),value=as.numeric(),stringsAsFactors = FALSE)
+for(i in 1:(ncol(boston)-1))
+{
+  # Storing independent variable names
+  var<-colnames(boston[i])
+  coefRes[i,1]<-var
+  # Extracting the beta1 estimates from the model
+  value<-round(fit[[i]][2,1],4)
+  coefRes[i,2]<-value
+}
+# Plotting the value of regression coefficients for each independent variable
+g<-ggplot(coefRes,aes(x=varName,y=value))
+g<-g + geom_point(color="skyblue",size=5)
+g<-g + geom_text(aes(label=varName), size=5)
+g<-g + labs(title="Comparing Regression Coefficients", 
+            x="Independent Variables", y="Coefficient Values")
+g
+
+```
+
+(d) Fit a multiple regression model to predict the response using all of the predictors. Describe your results. For which predictors can we reject the null hypothesis H0 : Beta-j = 0?
+\
+
+The summary shows that only variables indus and age are not statistically significant. Hence, for these two variables we fail to reject the null hypothesis that beta-j is equal to zero. This means that the association between these variables and the medv is not statistically significant. 
+\
+
+The summary and the coefplot of the multiple regression shows that nox, rm, chase, dis and ptratio have the strongest associations with the response variable. nox, dis and ptratio have negative beta1 estimates whereas chas and rm have positive beta1 estimates. 
+\
+
+```{r}
+# Variable for storing multiple regression model
+model<-"medv ~"
+# Loop to concatenate all the variables of the boston data set
+for(i in 1:(ncol(boston)-1))
+{
+  # concatenating each independent variable into the model
+  if(i<13)
+  {
+    # Extracting the name of the independent variables
+    var<-paste0(colnames(boston)[i]," +")
+    model<-paste(model,var,sep=" ")
+  }else
+  {
+    # Excluding the + sign at the end of the last variable
+    var<-paste0(colnames(boston)[i])
+    model<-paste(model,var,sep=" ")
+  }
+}
+
+# Performing multiple regression model  
+fitmlm<-lm(model,data=boston)
+# Summary of multiple regression
+summary(fitmlm)
+
+# Plot for understanding the various regression coefficients
+coefplot(fitmlm)
+
+```
+
+(e) How do your results from (c) compare to your results from (d)? Create a plot displaying the univariate regression coefficients from (c) on the x-axis and the multiple regression coefficients from part (d) on the y-axis. Use this visualization to support your response.
+\ 
+
+The plot between multivariate and univariate coefficients shows that although most variables estimates for both regression is close, variables like nox,dis,ptratio, chas,rm and lstat have differences. The linear regression of the multivariate and univariate coefficients shows that the slope is not equal to 1, which means there is definitely a difference between the coefficients. The linear model says that for every 1 unit increase in the univariate coefficients, the multivariate coefficients increase by 0.51 units.
+\
+
+The correlation matrix shows that there is some colinearity in the data. Comparing the results of the univariate and multivariate coefficient, we can observe that the greatest absolute difference in the coefficients is for nox, rm, chas, dis and ptratio in decreasing order. These are also the independent variables that have strong relationships with the response variable. Multiple regression adjusts for colinearity in the data and hence the difference between the univariate and multivariate coefficients. The plot shows the absolute difference between the beta1 estimates of the two egression coefficients.
+\
+
+```{r}
+# Creating a correlation matrix to understand colinearity in the data
+round(cor(as.matrix(boston[,1:13])),1)
+
+# Vectors for storing univariate, multivariate and 
+# the difference in the coefficients
+univariateCoef<-vector()
+multivariateCoef<-vector()
+diffCoef<-vector()
+# Extracting multivariate regression coefficients
+tempY<-as.data.frame(fitmlm$coefficients)
+colnames(tempY)<-"coefValue"
+for(i in 1:(ncol(boston)-1))
+{
+  # Extracting the univariate regression coefficients
+  tempX<-as.data.frame(fit[i])
+  # Extracting the beta1 estimates for univariate regression
+  univariateCoef[i]<-tempX[2,1]
+  # Extracting the beta1 estimates for multivariate regression
+  multivariateCoef[i]<-tempY$coefValue[i+1]
+}
+# Extracting the independent variables
+var=colnames(boston)[1:13]
+# Finding the difference between univariate and multivariate beta1 coefficients
+diffCoef<-abs(multivariateCoef-univariateCoef)
+# Creating a data frame of the beta1 estimates
+lmComparison<-data.frame(var,univariateCoef,multivariateCoef,diffCoef)
+
+# Plotting univariate and multivariate regression coefficients
+g<-ggplot(data=lmComparison,aes(x=univariateCoef,y=multivariateCoef))
+g<-g + geom_point(color="skyblue",size=3)
+g<-g + geom_text(aes(label=var), size=3)
+g<-g + geom_smooth(method="lm")
+g<-g + labs(title="Multivariate Vs Univariate Coefficients", 
+            x="Univariate Coefficients", y="Multivariate Coefficients")
+g
+
+# Linear regression of multivariate and univariate coefficients
+fitCoeff<-lm(multivariateCoef ~ univariateCoef)
+summary(fitCoeff)
+
+# Plot the absolute difference of the regression estimate coefficients(beta1)
+g<-ggplot(lmComparison,aes(x=var,y=diffCoef))
+g<-g + geom_point(color="skyblue",size=5)
+g<-g + geom_text(aes(label=var), size=5)
+g<-g + labs(title="Absolute Difference between Regression Coefficients", 
+            x="Variables", y="Abs. difference of Univariate and multivariate coeff")
+g
+
+```
+
+(f) Is there evidence of a non-linear association between any of the predictors and the response? To answer this question, for each predictor X fit a model of the form:
+Y = Beta0 + Beta1 X + Beta2 X2 + Beta3 X3 + Epsilon
+\ 
+
+From the polynomial regression, it can be observed that some of the variables such as nox, rm and dis have a non-linear regression, which is statistically significant(p value<0.05). For variables chas, ptratio, tax, age and black, the non-linear relationships are not statistically significant (p>0.05). For variables crim, zn, indus, nox, rm, dis, rad and lstat have evidence that there is a statistically significant non-linear relationship between the independent variable and the response variable.nox variable seems to only have a statistically significant(p value=0.04) association between the cube of the variable and the response variable. 
+\ 
+
+Except tax, black, ptratio and chas, there is evidence of non-linear relationship between the independent variables and the response variable. chas variable only has two values, so it does not have any scope of polynomial regression. nox is the only variable which has the bigger beta-j estimate for squared value than the beta1 estimate.
+\ 
+
+```{r}
+# Polynomial regression
+fitPolynomial<-list()
+# Loop for polynomial regression of each independent variable
+for(i in 1:(ncol(boston)-1))
+{
+  # coefficient estimates of the polynomial regression
+  fitPolynomial[[i]]<-summary(lm(boston$medv ~ boston[[i]] + 
+                                   I(boston[[i]]^2) + I(boston[[i]]^3),
+                                    data=boston))$coefficients
+}
+# Renaming the list elements with the variable names
+names(fitPolynomial)<-colnames(boston)[1:13]
+# Rounding the coefficient estimates
+lapply(fitPolynomial,round,digits=2)
+
+```
+\ 
+
+#### Miscellaneous ####
+
+\ 
+\
+
+(a) What assumptions are made about the distribution of the explanatory variable in the normal simple linear regression model?
+\ 
+
+Although the assumption for the linear model is that the relationship between explanatory variable and response variable should be linear, there is no particular assumption about the distribution of the explanatory variable.
+\ 
+
+(b) Why can an R2 close to one not be used as evidence that the simple linear regression model is appropriate?
+\ 
+
+It is possible that an r-squared value close to 1 is obtained even when one of the assumptions for the linear model is not satisfied. Hence, having an r-squared value close to one is not evidence that the simple linear model is appropriate.
+\ 
+
+(c) Consider a regression of weight on height for a sample of adult males. Suppose the intercept is 5 kg. Does this imply that males of height 0 weigh 5 kg, on average? Would this imply that the simple linear regression model is meaningless?
+\ 
+
+Practically there cannot be a height of 0 units. Also, linear model helps us in predicting and understanding the relationship between height and weight according to the given data set. When we consider height of 0 units, we are extrapolating the regression line, which may not be correct. Hence, the regression does not imply that males of height 0 weigh 5 kgs on average. This however does not imply that the regression model is meaningless. Regression is very useful for inference about the relationship between variables and it is also useful for predicting. But we should be cautious about infering or predicting outside of the range of the explanatory variables.
+\ 
+
+(d) Suppose you had data on pairs (X; Y ) which gave the scatterplot with cluster of points in two different directions. How would you approach the analysis?
+\ 
+
+The scatterplot shows that there could be other confounding variables that are influencing the relationship between the explanatory and the response variable. It could be that the explanatory variable has a different association with response variable for a subset of data having 'f' characteristics and a different association for the subset having 'm' charcateristics. For example, the females in the explanatory variable have a different association with the response variable than the males in the data set. Scatterplot shows two clusters behaving differently in the explanatory variable. Hence, we could consider other characteristics of the explanatory variable for better analysis.
+\  
+
